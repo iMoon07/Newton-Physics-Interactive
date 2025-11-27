@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Newton Physics Interactive</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+<h1>Newton Physics Interactive</h1>
+
+<div class="controls">
+    <button id="addObject">Add Object</button>
+    <button id="startSim">Start</button>
+    <button id="stopSim">Stop</button>
+    <button id="resetSim">Reset</button>
+    <button id="exportCSV">Export CSV</button>
+</div>
+
+<div id="objects"></div>
+
+<canvas id="simCanvas" width="900" height="300"></canvas>
+</div>
+
+<script src="script.js"></script>
+  <style>
+    :root{--bg:#071425;--card:#071627;--accent:#06b6d4;--muted:#94a3b8;--glass: rgba(255,255,255,0.03)}
+    html,body{height:100%;margin:0;font-family:Inter,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:linear-gradient(180deg,#071026,#071824);color:#e6eef8}
+    .wrap{display:grid;grid-template-columns:1fr 420px;gap:18px;padding:16px;height:100vh;box-sizing:border-box}
+    .stage{background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);border-radius:12px;padding:12px;display:flex;flex-direction:column;box-shadow:0 6px 20px rgba(2,6,23,0.6)}
+    .canvas-wrap{flex:1;min-height:420px;position:relative;border-radius:10px;overflow:hidden}
+    canvas{width:100%;height:100%;display:block}
+    .panel{background:var(--card);border-radius:12px;padding:12px;box-shadow:0 6px 18px rgba(2,6,23,0.5);overflow:auto}
+    h1{font-size:16px;margin:6px 0}
+    .controls{display:flex;flex-direction:column;gap:10px}
+    .row{display:flex;gap:8px;align-items:center}
+    label{width:120px;color:var(--muted);font-size:13px}
+    input[type=range]{flex:1}
+    select,input,button{background:transparent;border:1px solid rgba(255,255,255,0.06);color:inherit;padding:8px;border-radius:8px}
+    button.primary{background:var(--accent);color:#042027;border:none}
+    .small{font-size:13px;color:var(--muted)}
+    .readouts{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px}
+    .card{background:var(--glass);padding:8px;border-radius:8px;font-size:13px}
+    .footer{font-size:12px;color:var(--muted);margin-top:8px}
+    .controls-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .btn-row{display:flex;gap:8px}
+    .chart-wrap{height:170px;background:linear-gradient(180deg,#03121a,#021420);border-radius:8px;padding:8px}
+    .legend{display:flex;gap:8px;align-items:center}
+    .legend div{display:flex;gap:6px;align-items:center}
+    .dot{width:12px;height:12px;border-radius:3px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="stage">
+      <h1>Simulasi Lengkap Hukum Newton — Perbaikan</h1>
+      <div class="canvas-wrap">
+        <canvas id="world"></canvas>
+      </div>
+      <div style="display:flex;gap:12px;margin-top:10px">
+        <div class="chart-wrap" style="flex:1">
+          <canvas id="chart" width="400" height="160"></canvas>
+        </div>
+        <div style="width:300px">
+          <div class="small">Log singkat (klik untuk salin):</div>
+          <div id="log" class="card" style="height:140px;overflow:auto;cursor:pointer"></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="controls">
+        <div class="row"><label>Mode Pembelajaran</label><select id="mode"><option value="free">Eksperimen Bebas</option><option value="n1">Hukum Newton I</option><option value="n2">Hukum Newton II</option><option value="n3">Hukum Newton III</option></select></div>
+        <div class="row"><label>Benda aktif</label><select id="activeBody"></select></div>
+        <div class="row"><label>Jumlah benda</label><input id="numBodies" type="range" min="1" max="5" step="1" value="2"><div style="width:36px;text-align:right" id="numVal">2</div></div>
+        <div class="row"><label>Koef. Gesek μ</label><input id="fric" type="range" min="0" max="1" step="0.01" value="0.05"><div style="width:36px;text-align:right" id="fricVal">0.05</div></div>
+        <div class="row"><label>Gaya eksternal</label><input id="globalForce" type="range" min="-50" max="50" step="0.5" value="0"></div>
+        <div class="controls-grid">
+          <div>
+            <div class="row"><label>Simulasi</label><div class="btn-row"><button id="playBtn" class="primary">Play</button><button id="stepBtn">Step</button><button id="resetBtn">Reset</button></div></div>
+            <div class="row"><label>Deteksi tumbukan</label><select id="collisionType"><option value="elastic">Elastis</option><option value="inelastic">Inelastis</option></select></div>
+            <div class="row"><label>Download Data</label><div class="btn-row"><button id="downloadCSV">CSV</button><button id="downloadPNG">PNG</button></div></div>
+          </div>
+          <div>
+            <div class="row"><label>Suara tumbukan</label><select id="soundMode"><option value="on">On</option><option value="off">Off</option></select></div>
+            <div class="row"><label>Rumus</label><div class="small" id="formula">F = m · a</div></div>
+            <div class="row"><label>Data</label><div class="small">t: <span id="time">0.00</span>s</div></div>
+          </div>
+        </div>
+        <div class="row"><label>Vector forces</label><div class="small">Tampilkan panah gaya: <input id="showForces" type="checkbox" checked></div></div>
+        <div class="row"><label>Atur manual (benda)</label><button id="editBody">Edit Benda</button><button id="addBody">Tambah Benda</button><button id="removeBody">Hapus Benda</button></div>
+        <div class="readouts">
+          <div class="card">Posisi: <span id="pos">-</span></div>
+          <div class="card">Kecepatan: <span id="vel">-</span></div>
+          <div class="card">Akselerasi: <span id="acc">-</span></div>
+          <div class="card">Gaya total: <span id="ftotal">-</span></div>
+        </div>
+        <div class="footer">Panduan singkat: Klik & drag benda untuk memindahkan. Klik pada log untuk menyalin. Gunakan tombol Download untuk menyimpan data eksperimen.</div>
+      </div>
+    </div>
+  </div>
+  <script>
+    const canvas = document.getElementById('world');
+    const ctx = canvas.getContext('2d');
+    const chartCanvas = document.getElementById('chart');
+    const chartCtx = chartCanvas.getContext('2d');
+    const logEl = document.getElementById('log');
+    function fitCanvas(){
+      const dpr = window.devicePixelRatio || 1;
+      const cw = canvas.clientWidth || canvas.parentElement.clientWidth;
+      const ch = canvas.clientHeight || canvas.parentElement.clientHeight;
+      canvas.width = Math.max(1, Math.floor(cw * dpr));
+      canvas.height = Math.max(1, Math.floor(ch * dpr));
+      ctx.setTransform(dpr,0,0,dpr,0,0);
+      chartCanvas.width = Math.max(1, Math.floor(chartCanvas.clientWidth * dpr));
+      chartCanvas.height = Math.max(1, Math.floor(chartCanvas.clientHeight * dpr));
+      chartCtx.setTransform(dpr,0,0,dpr,0,0);
+    }
+    window.addEventListener('resize', fitCanvas);
+    class Body{
+      constructor(id,x,y,r,m,color){
+        this.id = id;
+        this.pos = {x:x,y:y};
+        this.prevPos = {x:x,y:y};
+        this.vel = {x:0,y:0};
+        this.acc = {x:0,y:0};
+        this.r = r;
+        this.mass = m;
+        this.color = color;
+        this.fixed = false;
+        this.elastic = 0.9;
+        this.name = 'B' + id;
+      }
+      applyForce(f){
+        if(this.mass === 0) return;
+        this.acc.x += (f.x || 0) / this.mass;
+        this.acc.y += (f.y || 0) / this.mass;
+      }
+      integrate(dt){
+        if(this.fixed){
+          this.vel.x = 0; this.vel.y = 0; this.acc.x = 0; this.acc.y = 0; return;
+        }
+        this.vel.x += this.acc.x * dt;
+        this.vel.y += this.acc.y * dt;
+        this.pos.x += this.vel.x * dt;
+        this.pos.y += this.vel.y * dt;
+        this.acc.x = 0; this.acc.y = 0;
+      }
+    }
+    let bodies = [];
+    let nextId = 1;
+    let running = false;
+    let lastTs = null;
+    let time = 0;
+    const dtFixed = 0.016;
+    const modeSel = document.getElementById('mode');
+    const numBodies = document.getElementById('numBodies');
+    const numVal = document.getElementById('numVal');
+    const fric = document.getElementById('fric');
+    const fricVal = document.getElementById('fricVal');
+    const globalForce = document.getElementById('globalForce');
+    const playBtn = document.getElementById('playBtn');
+    const stepBtn = document.getElementById('stepBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const collisionType = document.getElementById('collisionType');
+    const downloadCSV = document.getElementById('downloadCSV');
+    const downloadPNG = document.getElementById('downloadPNG');
+    const soundMode = document.getElementById('soundMode');
+    const formulaEl = document.getElementById('formula');
+    const timeEl = document.getElementById('time');
+    const posEl = document.getElementById('pos');
+    const velEl = document.getElementById('vel');
+    const accEl = document.getElementById('acc');
+    const ftotalEl = document.getElementById('ftotal');
+    const activeBodySel = document.getElementById('activeBody');
+    const showForces = document.getElementById('showForces');
+    const chartData = {t:[], pos:[], vel:[], acc:[]};
+    const audioCtx = (function(){ try{ return new (window.AudioContext||window.webkitAudioContext)(); }catch(e){return null;} })();
+    function playCollisionSound(vol){ if(!audioCtx) return; const o = audioCtx.createOscillator(); const g = audioCtx.createGain(); o.type = 'square'; o.frequency.value = 300 + Math.min(1000, vol*800); g.gain.value = Math.max(0, Math.min(0.02, vol*0.02)); o.connect(g); g.connect(audioCtx.destination); o.start(); setTimeout(()=>{ o.stop(); }, 80); }
+    let logData = [];
+    function recordStep(t){ for(const b of bodies){ logData.push({time: t, id: b.id, x: b.pos.x, y: b.pos.y, vx: b.vel.x, vy: b.vel.y, ax: b.acc.x || 0, ay: b.acc.y || 0, mass: b.mass}); } }
+    function exportCSV(){ if(logData.length === 0) return; let csv = 'time,id,x,y,vx,vy,ax,ay,mass\n'; for(const r of logData){ csv += `${r.time.toFixed(3)},${r.id},${r.x.toFixed(4)},${r.y.toFixed(4)},${r.vx.toFixed(4)},${r.vy.toFixed(4)},${r.ax.toFixed(6)},${r.ay.toFixed(6)},${r.mass}\n`; } const blob = new Blob([csv], {type:'text/csv'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'newton-full-log.csv'; a.click(); URL.revokeObjectURL(url); }
+    function resetScene(){ bodies = []; nextId = 1; time = 0; chartData.t.length = 0; chartData.pos.length = 0; chartData.vel.length = 0; chartData.acc.length = 0; logData.length = 0; fitCanvas(); const w = canvas.clientWidth, h = canvas.clientHeight; addBodyAt(120, Math.max(60,h/2|0), 28, 2, '#06b6d4'); addBodyAt(320, Math.max(60,h/2|0), 28, 1, '#f97316'); syncNum(); updateActiveList(); addLog('Scene reset.'); }
+    function addBodyAt(x,y,r,m,color){ const b = new Body(nextId++, x, y, r, m, color); bodies.push(b); return b }
+    function removeBody(){ if(bodies.length>0) bodies.pop(); updateActiveList(); }
+    function syncNum(){ numVal.textContent = String(bodies.length); }
+    function updateActiveList(){ activeBodySel.innerHTML = ''; for(const b of bodies){ const op = document.createElement('option'); op.value = String(b.id); op.textContent = b.name + ' (m=' + b.mass + ')'; activeBodySel.appendChild(op); } if(bodies.length) activeBodySel.value = String(bodies[0].id); }
+    function addLog(txt){ const p = document.createElement('div'); p.textContent = `[${time.toFixed(2)}s] ${txt}`; logEl.prepend(p); }
+    logEl.addEventListener('click', ()=>{ try{ const text = Array.from(logEl.children).map(n=>n.textContent).join('\n'); navigator.clipboard.writeText(text); }catch(e){} });
+    function handleCollisions(){ for(let i=0;i<bodies.length;i++){ for(let j=i+1;j<bodies.length;j++){ const A = bodies[i]; const B = bodies[j]; const dx = B.pos.x - A.pos.x; const dy = B.pos.y - A.pos.y; let dist = Math.hypot(dx, dy); const minD = A.r + B.r; if(dist === 0) dist = 0.0001; if(dist < minD){ const overlap = Math.max(0, minD - dist); const nx = dx / dist; const ny = dy / dist; const totalMass = (A.mass + B.mass) || 1; const correctionA = overlap * (B.mass / totalMass); const correctionB = overlap * (A.mass / totalMass); A.pos.x -= nx * correctionA; A.pos.y -= ny * correctionA; B.pos.x += nx * correctionB; B.pos.y += ny * correctionB; const relVelX = B.vel.x - A.vel.x; const relVelY = B.vel.y - A.vel.y; const relAlong = relVelX * nx + relVelY * ny; if(relAlong >= 0) continue; const e = (collisionType.value === 'elastic') ? Math.min(A.elastic, B.elastic) : 0; const j = -(1 + e) * relAlong / (1 / (A.mass || 1) + 1 / (B.mass || 1)); const impulseX = j * nx; const impulseY = j * ny; A.vel.x -= impulseX / (A.mass || 1); A.vel.y -= impulseY / (A.mass || 1); B.vel.x += impulseX / (B.mass || 1); B.vel.y += impulseY / (B.mass || 1); addLog(`Tumbukan antara ${A.name} & ${B.name} (e=${e.toFixed(2)})`); if(soundMode.value === 'on'){ playCollisionSound(Math.min(1, Math.abs(j) / 50)); } } } } }
+    function applyBounds(b){ const w = canvas.clientWidth, h = canvas.clientHeight; if(b.pos.x - b.r < 0){ b.pos.x = b.r; b.vel.x = -b.vel.x * 0.4; } if(b.pos.x + b.r > w){ b.pos.x = w - b.r; b.vel.x = -b.vel.x * 0.4; } if(b.pos.y - b.r < 0){ b.pos.y = b.r; b.vel.y = -b.vel.y * 0.4; } if(b.pos.y + b.r > h){ b.pos.y = h - b.r; b.vel.y = -b.vel.y * 0.4; } }
+    function step(dt){ const globalF = parseFloat(globalForce.value) || 0; const mu = parseFloat(fric.value) || 0; for(const b of bodies){ const gravity = {x:0, y: 9.81 * b.mass}; b.applyForce(gravity); if(Math.abs(globalF) > 1e-6) b.applyForce({x: globalF, y: 0}); const speed = Math.hypot(b.vel.x, b.vel.y); if(speed > 1e-6){ const fmag = mu * b.mass * 9.81; b.applyForce({x: -b.vel.x / speed * fmag, y: -b.vel.y / speed * fmag}); } b.integrate(dt); applyBounds(b); } handleCollisions(); time += dt; recordStep(time); if(bodies[0]){ chartData.t.push(time); chartData.pos.push(bodies[0].pos.x); chartData.vel.push(bodies[0].vel.x); chartData.acc.push(bodies[0].acc.x || 0); if(chartData.t.length > 800){ chartData.t.shift(); chartData.pos.shift(); chartData.vel.shift(); chartData.acc.shift(); } } }
+    function drawWorld(){ const W = canvas.clientWidth, H = canvas.clientHeight; ctx.clearRect(0,0,W,H); ctx.fillStyle = '#02121a'; ctx.fillRect(0, H - 40, W, 40); for(const b of bodies){ ctx.beginPath(); ctx.ellipse(b.pos.x, b.pos.y + b.r * 0.8, b.r * 0.9, b.r * 0.3, 0, 0, Math.PI * 2); ctx.fillStyle = 'rgba(0,0,0,0.14)'; ctx.fill(); ctx.beginPath(); ctx.fillStyle = b.color || '#ffffff'; ctx.arc(b.pos.x, b.pos.y, b.r, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.stroke(); ctx.fillStyle = 'white'; ctx.font = '12px sans-serif'; ctx.fillText(b.name, b.pos.x - b.r / 1.6, b.pos.y - b.r - 6); if(showForces.checked){ drawArrow(b.pos.x, b.pos.y, b.pos.x + b.vel.x * 6, b.pos.y + b.vel.y * 6, false); drawArrow(b.pos.x, b.pos.y - b.r - 10, b.pos.x + (b.acc.x || 0) * 250, b.pos.y + (b.acc.y || 0) * 250, true); } } }
+    function drawArrow(x1,y1,x2,y2,isAcc){ ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.strokeStyle = isAcc ? '#ff6b6b' : '#ffd166'; ctx.lineWidth = 2; ctx.stroke(); const ang = Math.atan2(y2 - y1, x2 - x1); ctx.beginPath(); ctx.moveTo(x2, y2); ctx.lineTo(x2 - 6 * Math.cos(ang - 0.4), y2 - 6 * Math.sin(ang - 0.4)); ctx.lineTo(x2 - 6 * Math.cos(ang + 0.4), y2 - 6 * Math.sin(ang + 0.4)); ctx.closePath(); ctx.fillStyle = isAcc ? '#ff6b6b' : '#ffd166'; ctx.fill(); }
+    function drawChart(){ const W = chartCanvas.clientWidth, H = chartCanvas.clientHeight; chartCtx.clearRect(0,0,W,H); if(chartData.t.length < 2) return; function plot(arr){ const min = Math.min.apply(null, arr); const max = Math.max.apply(null, arr); const range = (max - min) || 1; chartCtx.beginPath(); for(let i = 0; i < arr.length; i++){ const x = (i / (arr.length - 1)) * (W - 10) + 5; const y = H - ((arr[i] - min) / range) * (H - 20) - 10; if(i === 0) chartCtx.moveTo(x, y); else chartCtx.lineTo(x, y); } chartCtx.strokeStyle = arguments[1]; chartCtx.lineWidth = 1.8; chartCtx.stroke(); }
+      plot(chartData.pos, '#06b6d4'); plot(chartData.vel, '#f97316'); plot(chartData.acc, '#ff6b6b'); chartCtx.fillStyle = '#cfeffd'; chartCtx.font = '12px sans-serif'; chartCtx.fillText('Pos X', 8, 12); chartCtx.fillStyle = '#f97316'; chartCtx.fillText('Vel X', 70, 12); chartCtx.fillStyle = '#ff6b6b'; chartCtx.fillText('Acc X', 134, 12); }
+    playBtn.addEventListener('click', ()=>{ running = !running; playBtn.textContent = running ? 'Pause' : 'Play'; if(running){ lastTs = null; } });
+    stepBtn.addEventListener('click', ()=>{ step(dtFixed); drawWorld(); drawChart(); updateReadouts(); });
+    resetBtn.addEventListener('click', ()=>{ resetScene(); drawWorld(); drawChart(); updateReadouts(); });
+    numBodies.addEventListener('input', ()=>{ const target = parseInt(numBodies.value, 10); while(bodies.length < target) addBodyAt(100 + bodies.length * 80, Math.max(60, canvas.clientHeight / 2 | 0), 28, 1 + Math.random() * 2, randomColor()); while(bodies.length > target) removeBody(); syncNum(); updateActiveList(); });
+    fric.addEventListener('input', ()=>{ fricVal.textContent = fric.value; });
+    downloadCSV.addEventListener('click', ()=>{ exportCSV(); });
+    downloadPNG.addEventListener('click', ()=>{ const link = document.createElement('a'); link.href = canvas.toDataURL('image/png'); link.download = 'simulasi_newton.png'; link.click(); });
+    collisionType.addEventListener('change', ()=>{ addLog('Tipe tumbukan: ' + collisionType.value); });
+    function updateReadouts(){ const b = bodies.find(x => String(x.id) === String(activeBodySel.value)) || bodies[0]; if(!b) return; posEl.textContent = b.pos.x.toFixed(2) + ', ' + b.pos.y.toFixed(2); velEl.textContent = b.vel.x.toFixed(2) + ', ' + b.vel.y.toFixed(2); accEl.textContent = (b.acc.x || 0).toFixed(2) + ', ' + (b.acc.y || 0).toFixed(2); ftotalEl.textContent = (b.mass * Math.hypot(b.acc.x || 0, b.acc.y || 0)).toFixed(2); timeEl.textContent = time.toFixed(2); }
+    function exportDataCSV(){ exportCSV(); }
+    function randomColor(){ const pal = ['#06b6d4','#f97316','#a78bfa','#34d399','#ff6b6b']; return pal[Math.floor(Math.random() * pal.length)]; }
+    let dragging = false, dragBody = null, dragOff = {x:0,y:0};
+    canvas.addEventListener('mousedown', (e)=>{ const rc = canvas.getBoundingClientRect(); const mx = e.clientX - rc.left; const my = e.clientY - rc.top; for(let i = bodies.length - 1; i >= 0; i--){ const b = bodies[i]; if(Math.hypot(mx - b.pos.x, my - b.pos.y) < b.r){ dragging = true; dragBody = b; dragOff.x = mx - b.pos.x; dragOff.y = my - b.pos.y; b.fixed = true; break; } } });
+    window.addEventListener('mousemove', (e)=>{ if(!dragging || !dragBody) return; const rc = canvas.getBoundingClientRect(); const mx = e.clientX - rc.left; const my = e.clientY - rc.top; dragBody.pos.x = mx - dragOff.x; dragBody.pos.y = my - dragOff.y; dragBody.vel.x = 0; dragBody.vel.y = 0; updateReadouts(); });
+    window.addEventListener('mouseup', ()=>{ if(dragging && dragBody){ dragBody.fixed = false; dragging = false; dragBody = null; } });
+    function loop(ts){ if(!lastTs) lastTs = ts; const dt = Math.min(0.032, (ts - lastTs) / 1000); lastTs = ts; if(running){ let acc = 0; while(acc < dt){ const stepDt = Math.min(0.008, dt - acc); step(stepDt); acc += stepDt; } drawWorld(); drawChart(); updateReadouts(); } else { drawWorld(); drawChart(); updateReadouts(); } requestAnimationFrame(loop); }
+    document.getElementById('addBody').addEventListener('click', ()=>{ addBodyAt(100 + bodies.length * 60, Math.max(60, canvas.clientHeight / 2 | 0), 24, 1 + Math.random() * 2, randomColor()); syncNum(); updateActiveList(); addLog('Menambah benda'); drawWorld(); });
+    document.getElementById('removeBody').addEventListener('click', ()=>{ if(bodies.length > 1){ removeBody(); syncNum(); updateActiveList(); addLog('Menghapus benda'); drawWorld(); } });
+    document.getElementById('editBody').addEventListener('click', ()=>{ const b = bodies.find(x => String(x.id) === String(activeBodySel.value)) || bodies[0]; if(!b) return; const m = prompt('Masukkan massa untuk ' + b.name + ' (kg):', String(b.mass)); const r = prompt('Radius (px):', String(b.r)); if(m !== null){ const mv = parseFloat(m); if(!Number.isNaN(mv) && mv > 0) b.mass = mv; } if(r !== null){ const rv = parseFloat(r); if(!Number.isNaN(rv) && rv > 0) b.r = rv; } updateActiveList(); addLog('Mengedit ' + b.name); });
+    fitCanvas(); resetScene(); drawWorld(); drawChart(); updateReadouts(); requestAnimationFrame(loop);
+    modeSel.addEventListener('change', ()=>{ const v = modeSel.value; if(v === 'n1') formulaEl.textContent = 'Hukum I: Benda akan tetap pada keadaan diam atau gerak lurus beraturan kecuali gaya resultant bekerja.'; else if(v === 'n2') formulaEl.textContent = 'Hukum II: F = m · a (resultan gaya = massa × percepatan).'; else if(v === 'n3') formulaEl.textContent = 'Hukum III: Untuk setiap aksi ada reaksi yang sama besar dan berlawanan arah.'; else formulaEl.textContent = 'F = m · a'; addLog('Mode: ' + v); });
+    updateActiveList(); setInterval(()=>{ drawChart(); }, 300);
+  </script>
+</body>
+</html>
